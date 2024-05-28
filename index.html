@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banking Simulator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 50px auto;
+            text-align: center;
+        }
+        input, button {
+            margin: 5px;
+            padding: 8px;
+            width: 200px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .account, .transfer, .withdraw, .loan-repay, .register {
+            display: none;
+        }
+        h2 {
+            margin-top: 20px;
+        }
+        #user {
+            font-weight: bold;
+        }
+        #balance {
+            font-weight: bold;
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Banking Simulator</h1>
+        <div class="login">
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <button onclick="login()">Login</button>
+            <p>Don't have an account? <a href="#" onclick="showRegister()">Register</a></p>
+        </div>
+        <div class="register">
+            <h2>Register</h2>
+            <input type="text" id="newUsername" placeholder="New Username">
+            <input type="password" id="newPassword" placeholder="New Password">
+            <input type="password" id="newPin" placeholder="New PIN (4 digits)">
+            <button onclick="register()">Register</button>
+            <p>Already have an account? <a href="#" onclick="showLogin()">Login</a></p>
+        </div>
+        <div class="account" id="account">
+            <h2>Welcome, <span id="user"></span></h2>
+            <p>Balance: $<span id="balance">1000</span></p>
+            <input type="number" id="amount" placeholder="Enter amount">
+            <button onclick="deposit()">Deposit</button>
+            <button onclick="showWithdraw()">Withdraw</button>
+            <button onclick="showTransfer()">Transfer</button>
+            <button onclick="showLoanRepay()">Loan Options</button>
+            <button onclick="logout()">Logout</button>
+            <p id="loanInfo" style="color: red;"></p>
+        </div>
+        <div class="withdraw" id="withdraw">
+            <h2>Withdraw Money</h2>
+            <input type="number" id="withdrawAmount" placeholder="Amount to Withdraw">
+            <input type="password" id="withdrawPin" placeholder="Enter PIN">
+            <button onclick="withdraw()">Withdraw</button>
+            <button onclick="cancelWithdraw()">Cancel</button>
+        </div>
+        <div class="transfer" id="transfer">
+            <h2>Transfer Money</h2>
+            <input type="text" id="recipient" placeholder="Recipient Username">
+            <input type="number" id="transferAmount" placeholder="Amount to Transfer">
+            <input type="password" id="transferPin" placeholder="Enter PIN">
+            <button onclick="transfer()">Transfer</button>
+            <button onclick="cancelTransfer()">Cancel</button>
+        </div>
+        <div class="loan-repay" id="loan-repay">
+            <h2>Loan Options</h2>
+            <input type="number" id="loanAmount" placeholder="Loan Amount">
+            <button onclick="takeLoan()">Take Loan</button>
+            <input type="number" id="repayAmount" placeholder="Repay Amount">
+            <button onclick="repayLoan()">Repay Loan</button>
+            <button onclick="cancelLoanRepay()">Cancel</button>
+        </div>
+    </div>
+    <script>
+        let users = {
+            user: { password: 'pass', balance: 1000, pin: '1234', loan: 0, loanDueTime: null, banned: false }
+        };
+        let loggedIn = false;
+
+        function register() {
+            const newUsername = document.getElementById('newUsername').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const newPin = document.getElementById('newPin').value;
+            
+            if (newUsername && newPassword && newPin && newPin.length === 4 && !isNaN(newPin)) {
+                if (!users[newUsername]) {
+                    users[newUsername] = { 
+                        password: newPassword, 
+                        balance: 1000.00, 
+                        pin: newPin, 
+                        loan: 0, 
+                        loanDueTime: null, 
+                        banned: false 
+                    };
+                    alert('Registration successful! Please login.');
+                    showLogin();
+                } else {
+                    alert('Username already exists');
+                }
+            } else {
+                alert('Please enter a valid username, password, and 4-digit PIN');
+            }
+        }
+
+        function showRegister() {
+            document.querySelector('.login').style.display = 'none';
+            document.querySelector('.register').style.display = 'block';
+        }
+
+        function showLogin() {
+            document.querySelector('.login').style.display = 'block';
+            document.querySelector('.register').style.display = 'none';
+        }
+
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (users[username] && users[username].password === password && !users[username].banned) {
+                loggedIn = true;
+                document.getElementById('account').style.display = 'block';
+                document.getElementById('user').innerText = username;
+                document.querySelector('.login').style.display = 'none';
+                document.querySelector('.register').style.display = 'none';
+                document.getElementById('balance').innerText = users[username].balance.toFixed(2);
+                updateLoanInfo();
+            } else if (users[username] && users[username].banned) {
+                alert('This account is banned');
+            } else {
+                alert('Invalid username or password');
+            }
+        }
+
+        function deposit() {
+            if (loggedIn) {
+                const username = document.getElementById('user').innerText;
+                const amount = parseFloat(document.getElementById('amount').value);
+                if (!isNaN(amount) && amount > 0) {
+                    users[username].balance += amount;
+                    document.getElementById('balance').innerText = users[username].balance.toFixed(2);
+                } else {
+                    alert('Please enter a valid amount');
+                }
+            } else {
+                alert('Please login first');
+            }
+        }
+
+        function showWithdraw() {
+            document.getElementById('withdraw').style.display = 'block';
+            document.getElementById('account').style.display = 'none';
+        }
+
+        function withdraw() {
+            if (loggedIn) {
+                const username = document.getElementById('user').innerText;
+                const amount = parseFloat(document.getElementById('withdrawAmount').value);
+                const pin = document.getElementById('withdrawPin').value;
+                if (amount > 0 && amount <= users[username].balance && pin === users[username].pin) {
+                    users[username].balance -= amount;
+                    document.getElementById('balance').innerText = users[username].balance.toFixed(2);
+                    alert(`Withdrew $${amount.toFixed(2)}`);
+                    cancelWithdraw();
+                } else if (pin !== users[username].pin) {
+                    alert('Incorrect PIN');
+                } else if (amount > users[username].balance) {
+                    alert('Insufficient balance');
+                } else {
+                    alert('Please enter a valid amount');
+                }
+            } else {
+                alert('Please login first');
+            }
+        }
+
+        function cancelWithdraw() {
+            document.getElementById('withdraw').style.display = 'none';
+            document.getElementById('account').style.display = 'block';
+            document.getElementById('withdrawAmount').value = '';
+            document.getElementById('withdrawPin').value = '';
+        }
+
+        function showTransfer() {
+            document.getElementById('transfer').style.display = 'block';
+            document.getElementById('account').style.display = 'none';
+        }
+
+        function transfer() {
+            if (loggedIn) {
+                const recipient = document.getElementById('recipient').value;
+                const transferAmount = parseFloat(document.getElementById('transferAmount').value);
+                const pin = document.getElementById('transferPin').value;
+                const username = document.getElementById('user').innerText;
+                
+                // Validate recipient
+                if (!users[recipient]) {
+                    alert('Invalid recipient username');
+                    return;
+                }
+
+                // Validate amount
+                if (isNaN(transferAmount) || transferAmount <= 0) {
+                    alert('Please enter a valid amount');
+                    return;
+                }
+
+                // Validate PIN
+                if (pin !== users[username].pin) {
+                    alert('Invalid PIN');
+                    return;
+                }
+ 
+              // Check if the user has enough balance
+                if (transferAmount > users[username].balance) {
+                    alert('Insufficient balance');
+                    return;
+                }
+
+                // Perform the transfer
+                users[username].balance -= transferAmount;
+                users[recipient].balance += transferAmount;
+
+                document.getElementById('balance').innerText = users[username].balance.toFixed(2);
+                alert(`Transferred $${transferAmount.toFixed(2)} to ${recipient}`);
+
+                // Clear input fields and go back to account view
+                cancelTransfer();
+            } else {
+                alert('Please login first');
+            }
+        }
+
+        function cancelTransfer() {
+            document.getElementById('transfer').style.display = 'none';
+            document.getElementById('account').style.display = 'block';
+            document.getElementById('recipient').value = '';
+            document.getElementById('transferAmount').value = '';
+            document.getElementById('transferPin').value = '';
+        }
+
+        function showLoanRepay() {
+            document.getElementById('loan-repay').style.display = 'block';
+            document.getElementById('account').style.display = 'none';
+        }
+
+        function takeLoan() {
+            if (loggedIn) {
+                const username = document.getElementById('user').innerText;
+                const loanAmount = parseFloat(document.getElementById('loanAmount').value);
+
+                if (!isNaN(loanAmount) && loanAmount > 0) {
+                    users[username].balance += loanAmount;
+                    users[username].loan += loanAmount;
+                    users[username].loanDueTime = Date.now() + 300000; // 5 minutes to repay the loan
+                    document.getElementById('balance').innerText = users[username].balance.toFixed(2);
+                    updateLoanInfo();
+                    alert(`Loan of $${loanAmount.toFixed(2)} granted. You have 5 minutes to repay the loan.`);
+                } else {
+                    alert('Please enter a valid loan amount');
+                }
+            } else {
+                alert('Please login first');
+            }
+        }
+
+        function repayLoan() {
+            if (loggedIn) {
+                const username = document.getElementById('user').innerText;
+                const repayAmount = parseFloat(document.getElementById('repayAmount').value);
+
+                if (!isNaN(repayAmount) && repayAmount > 0 && repayAmount <= users[username].balance && repayAmount <= users[username].loan) {
+                    users[username].balance -= repayAmount;
+                    users[username].loan -= repayAmount;
+                    if (users[username].loan === 0) {
+                        users[username].loanDueTime = null;
+                    }
+                    document.getElementById('balance').innerText = users[username].balance.toFixed(2);
+                    updateLoanInfo();
+                    alert(`Repaid $${repayAmount.toFixed(2)} of your loan.`);
+                    cancelLoanRepay();
+                } else {
+                    alert('Please enter a valid repayment amount');
+                }
+            } else {
+                alert('Please login first');
+            }
+        }
+
+        function cancelLoanRepay() {
+            document.getElementById('loan-repay').style.display = 'none';
+            document.getElementById('account').style.display = 'block';
+            document.getElementById('loanAmount').value = '';
+            document.getElementById('repayAmount').value = '';
+        }
+
+        function updateLoanInfo() {
+            const username = document.getElementById('user').innerText;
+            if (users[username].loan > 0) {
+                const remainingTime = Math.max(0, users[username].loanDueTime - Date.now());
+                if (remainingTime > 0) {
+                    const minutes = Math.floor(remainingTime / 60000);
+                    const seconds = Math.floor((remainingTime % 60000) / 1000);
+                    document.getElementById('loanInfo').innerText = `Loan: $${users[username].loan.toFixed(2)} - Repay within ${minutes}m ${seconds}s`;
+                    setTimeout(updateLoanInfo, 1000);
+                } else {
+                    banUser(username);
+                }
+            } else {
+                document.getElementById('loanInfo').innerText = '';
+            }
+        }
+
+        function banUser(username) {
+            users[username].banned = true;
+            users[username].loan = 0;
+            alert('You have been banned for not repaying the loan on time.');
+            logout();
+        }
+
+        function logout() {
+            loggedIn = false;
+            document.getElementById('account').style.display = 'none';
+            document.querySelector('.login').style.display = 'block';
+            document.querySelector('.register').style.display = 'none';
+            document.getElementById('withdraw').style.display = 'none';
+            document.getElementById('transfer').style.display = 'none';
+            document.getElementById('loan-repay').style.display = 'none';
+            document.getElementById('loanInfo').innerText = '';
+        }
+    </script>
+</body>
+</html>
